@@ -1,0 +1,38 @@
+{
+  "name": "sparkb-sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK and ORM client for SparkDB.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "sparkdb",
+    "database",
+    "orm",
+    "postgres",
+    "mysql",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
