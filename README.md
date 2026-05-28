@@ -31,9 +31,3 @@ await db.from<User>('users').where({ email: 'ada@sparkdb.pro' }).delete();
 ```
 
 The SDK sends the database URL plus API key to SparkDB's `/api/sdk/*` endpoints. API keys are sent with the `X-Spark-API-Key` header.
-
-## Publish
-
-```sh
-npm publish
-```
