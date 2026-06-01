@@ -6,16 +6,17 @@ export class SparkError extends Error {
     }
 }
 export class client {
-    constructor(databaseUrl, apiKey, options = {}) {
-        var _a;
+    constructor(typeOrDatabaseUrl, credentialsOrApiKey, options = {}) {
+        const { type, databaseUrl, apiKey } = normalizeConstructorArgs(typeOrDatabaseUrl, credentialsOrApiKey);
         if (!databaseUrl)
             throw new Error('SparkDB database url is required.');
         if (!apiKey)
             throw new Error('SparkDB api key is required.');
+        this.type = type;
         this.databaseUrl = databaseUrl;
         this.apiKey = apiKey;
         this.baseUrl = (options.baseUrl ?? 'https://api.sparkdb.pro').replace(/\/$/, '');
-        const fetcher = options.fetch ?? ((_a = globalThis.fetch) === null || _a === void 0 ? void 0 : _a.bind(globalThis));
+        const fetcher = options.fetch ?? globalThis.fetch?.bind(globalThis);
         if (!fetcher)
             throw new Error('SparkDB SDK requires fetch. Pass options.fetch in this runtime.');
         this.fetcher = fetcher;
@@ -44,6 +45,17 @@ export class client {
     async dropTable(name) {
         return this.request('/api/sdk/table/drop', { name });
     }
+    async migrateTo(target, options = {}) {
+        return this.request('/api/sdk/migrate', {
+            target_database_url: target.databaseUrl,
+            source_type: this.type,
+            target_type: target.type,
+            ...normalizeMigrationOptions(options)
+        });
+    }
+    async migrateFrom(source, options = {}) {
+        return source.migrateTo(this, options);
+    }
     async request(path, body) {
         const response = await this.fetcher(`${this.baseUrl}${path}`, {
             method: 'POST',
@@ -59,7 +71,7 @@ export class client {
         if (!response.ok) {
             let message = `SparkDB request failed with status ${response.status}`;
             try {
-                const payload = await response.json();
+                const payload = (await response.json());
                 message = payload.error ?? payload.message ?? message;
             }
             catch { }
@@ -69,6 +81,21 @@ export class client {
         if (!text)
             return undefined;
         return JSON.parse(text);
+    }
+}
+export class PostgresClient extends client {
+    constructor(credentials, options) {
+        super('postgres', credentials, options);
+    }
+}
+export class MySQLClient extends client {
+    constructor(credentials, options) {
+        super('mysql', credentials, options);
+    }
+}
+export class MongoDBClient extends client {
+    constructor(credentials, options) {
+        super('mongodb', credentials, options);
     }
 }
 export class TableClient {
@@ -113,6 +140,37 @@ export class TableClient {
             where: this.filters
         });
     }
+}
+function normalizeConstructorArgs(typeOrDatabaseUrl, credentialsOrApiKey) {
+    if (isDatabaseType(typeOrDatabaseUrl)) {
+        const credentials = credentialsOrApiKey;
+        return {
+            type: typeOrDatabaseUrl,
+            databaseUrl: credentials.database_url ?? credentials.databaseUrl ?? '',
+            apiKey: credentials.apiKey ?? credentials.apikey ?? ''
+        };
+    }
+    return {
+        type: inferDatabaseType(typeOrDatabaseUrl),
+        databaseUrl: typeOrDatabaseUrl,
+        apiKey: String(credentialsOrApiKey ?? '')
+    };
+}
+function normalizeMigrationOptions(options) {
+    return {
+        tables: options.tables?.map((table) => (typeof table === 'string' ? { name: table } : table)),
+        drop_existing: options.dropExisting ?? false
+    };
+}
+function isDatabaseType(value) {
+    return value === 'postgres' || value === 'mysql' || value === 'mongodb';
+}
+function inferDatabaseType(databaseUrl) {
+    if (databaseUrl.startsWith('mysql://'))
+        return 'mysql';
+    if (databaseUrl.startsWith('mongodb://') || databaseUrl.startsWith('mongodb+srv://'))
+        return 'mongodb';
+    return 'postgres';
 }
 export { client as SparkClient };
 export default client;

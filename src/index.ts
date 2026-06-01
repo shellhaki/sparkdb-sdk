@@ -3,9 +3,18 @@ export type JsonValue = Primitive | JsonValue[] | { [key: string]: JsonValue };
 export type Row = Record<string, unknown>;
 export type Where<T extends object = Row> = Partial<T>;
 
+export type DatabaseType = 'postgres' | 'mysql' | 'mongodb';
+
 export type SparkClientOptions = {
   baseUrl?: string;
   fetch?: typeof fetch;
+};
+
+export type SparkCredentials = {
+  database_url?: string;
+  databaseUrl?: string;
+  apiKey?: string;
+  apikey?: string;
 };
 
 export type QueryResult<T extends object = Row> = {
@@ -58,11 +67,42 @@ export type SchemaTable = {
 
 export type Schema = {
   database_id: number;
-  type: 'postgres' | 'mysql' | 'mongodb' | string;
+  type: DatabaseType | string;
   tables: SchemaTable[];
 };
 
+export type MigrationTableOptions = {
+  name: string;
+  targetName?: string;
+  where?: Where;
+  limit?: number;
+};
+
+export type MigrationOptions = {
+  tables?: Array<string | MigrationTableOptions>;
+  dropExisting?: boolean;
+};
+
+export type MigrationTableResult = {
+  source: string;
+  target: string;
+  rows_read: number;
+  rows_written: number;
+  created: boolean;
+};
+
+export type MigrationResult = {
+  from: DatabaseType | string;
+  to: DatabaseType | string;
+  tables: MigrationTableResult[];
+  rows_read: number;
+  rows_written: number;
+  duration_ms: number;
+  message: string;
+};
+
 type RequestBody = Record<string, unknown>;
+type ClientConstructorInput = SparkCredentials | string;
 
 export class SparkError extends Error {
   status: number;
@@ -75,15 +115,21 @@ export class SparkError extends Error {
 }
 
 export class client {
+  readonly type: DatabaseType;
   private readonly databaseUrl: string;
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly fetcher: typeof fetch;
 
-  constructor(databaseUrl: string, apiKey: string, options: SparkClientOptions = {}) {
+  constructor(type: DatabaseType, credentials: SparkCredentials, options?: SparkClientOptions);
+  constructor(databaseUrl: string, apiKey: string, options?: SparkClientOptions);
+  constructor(typeOrDatabaseUrl: DatabaseType | string, credentialsOrApiKey: ClientConstructorInput, options: SparkClientOptions = {}) {
+    const { type, databaseUrl, apiKey } = normalizeConstructorArgs(typeOrDatabaseUrl, credentialsOrApiKey);
+
     if (!databaseUrl) throw new Error('SparkDB database url is required.');
     if (!apiKey) throw new Error('SparkDB api key is required.');
 
+    this.type = type;
     this.databaseUrl = databaseUrl;
     this.apiKey = apiKey;
     this.baseUrl = (options.baseUrl ?? 'https://api.sparkdb.pro').replace(/\/$/, '');
@@ -121,6 +167,19 @@ export class client {
     return this.request<QueryResult>('/api/sdk/table/drop', { name });
   }
 
+  async migrateTo(target: client, options: MigrationOptions = {}) {
+    return this.request<MigrationResult>('/api/sdk/migrate', {
+      target_database_url: target.databaseUrl,
+      source_type: this.type,
+      target_type: target.type,
+      ...normalizeMigrationOptions(options)
+    });
+  }
+
+  async migrateFrom(source: client, options: MigrationOptions = {}) {
+    return source.migrateTo(this, options);
+  }
+
   async request<T>(path: string, body: RequestBody): Promise<T> {
     const response = await this.fetcher(`${this.baseUrl}${path}`, {
       method: 'POST',
@@ -146,6 +205,24 @@ export class client {
     const text = await response.text();
     if (!text) return undefined as T;
     return JSON.parse(text) as T;
+  }
+}
+
+export class PostgresClient extends client {
+  constructor(credentials: SparkCredentials, options?: SparkClientOptions) {
+    super('postgres', credentials, options);
+  }
+}
+
+export class MySQLClient extends client {
+  constructor(credentials: SparkCredentials, options?: SparkClientOptions) {
+    super('mysql', credentials, options);
+  }
+}
+
+export class MongoDBClient extends client {
+  constructor(credentials: SparkCredentials, options?: SparkClientOptions) {
+    super('mongodb', credentials, options);
   }
 }
 
@@ -201,6 +278,40 @@ export class TableClient<T extends object = Row> {
       where: this.filters
     });
   }
+}
+
+function normalizeConstructorArgs(typeOrDatabaseUrl: DatabaseType | string, credentialsOrApiKey: ClientConstructorInput) {
+  if (isDatabaseType(typeOrDatabaseUrl)) {
+    const credentials = credentialsOrApiKey as SparkCredentials;
+    return {
+      type: typeOrDatabaseUrl,
+      databaseUrl: credentials.database_url ?? credentials.databaseUrl ?? '',
+      apiKey: credentials.apiKey ?? credentials.apikey ?? ''
+    };
+  }
+
+  return {
+    type: inferDatabaseType(typeOrDatabaseUrl),
+    databaseUrl: typeOrDatabaseUrl,
+    apiKey: String(credentialsOrApiKey ?? '')
+  };
+}
+
+function normalizeMigrationOptions(options: MigrationOptions) {
+  return {
+    tables: options.tables?.map((table) => (typeof table === 'string' ? { name: table } : table)),
+    drop_existing: options.dropExisting ?? false
+  };
+}
+
+function isDatabaseType(value: string): value is DatabaseType {
+  return value === 'postgres' || value === 'mysql' || value === 'mongodb';
+}
+
+function inferDatabaseType(databaseUrl: string): DatabaseType {
+  if (databaseUrl.startsWith('mysql://')) return 'mysql';
+  if (databaseUrl.startsWith('mongodb://') || databaseUrl.startsWith('mongodb+srv://')) return 'mongodb';
+  return 'postgres';
 }
 
 export { client as SparkClient };

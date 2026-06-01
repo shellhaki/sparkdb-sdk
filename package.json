@@ -1,5 +1,5 @@
 {
-  "name": "sparkb-sdk",
+  "name": "@shellhaki/sparkdb-sdk",
   "version": "1.0.0",
   "description": "TypeScript SDK and ORM client for SparkDB.",
   "type": "module",
