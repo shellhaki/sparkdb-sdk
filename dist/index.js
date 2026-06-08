@@ -45,17 +45,6 @@ export class client {
     async dropTable(name) {
         return this.request('/api/sdk/table/drop', { name });
     }
-    async migrateTo(target, options = {}) {
-        return this.request('/api/sdk/migrate', {
-            target_database_url: target.databaseUrl,
-            source_type: this.type,
-            target_type: target.type,
-            ...normalizeMigrationOptions(options)
-        });
-    }
-    async migrateFrom(source, options = {}) {
-        return source.migrateTo(this, options);
-    }
     async request(path, body) {
         const response = await this.fetcher(`${this.baseUrl}${path}`, {
             method: 'POST',
@@ -154,12 +143,6 @@ function normalizeConstructorArgs(typeOrDatabaseUrl, credentialsOrApiKey) {
         type: inferDatabaseType(typeOrDatabaseUrl),
         databaseUrl: typeOrDatabaseUrl,
         apiKey: String(credentialsOrApiKey ?? '')
-    };
-}
-function normalizeMigrationOptions(options) {
-    return {
-        tables: options.tables?.map((table) => (typeof table === 'string' ? { name: table } : table)),
-        drop_existing: options.dropExisting ?? false
     };
 }
 function isDatabaseType(value) {

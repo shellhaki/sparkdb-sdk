@@ -51,32 +51,6 @@ export type Schema = {
     type: DatabaseType | string;
     tables: SchemaTable[];
 };
-export type MigrationTableOptions = {
-    name: string;
-    targetName?: string;
-    where?: Where;
-    limit?: number;
-};
-export type MigrationOptions = {
-    tables?: Array<string | MigrationTableOptions>;
-    dropExisting?: boolean;
-};
-export type MigrationTableResult = {
-    source: string;
-    target: string;
-    rows_read: number;
-    rows_written: number;
-    created: boolean;
-};
-export type MigrationResult = {
-    from: DatabaseType | string;
-    to: DatabaseType | string;
-    tables: MigrationTableResult[];
-    rows_read: number;
-    rows_written: number;
-    duration_ms: number;
-    message: string;
-};
 type RequestBody = Record<string, unknown>;
 export declare class SparkError extends Error {
     status: number;
@@ -95,8 +69,6 @@ export declare class client {
     query<T extends object = Row>(query: string): Promise<QueryResult<T>>;
     createTable(name: string, columns: ColumnDefinition[], schema?: MongoSchemaField[]): Promise<QueryResult<Row>>;
     dropTable(name: string): Promise<QueryResult<Row>>;
-    migrateTo(target: client, options?: MigrationOptions): Promise<MigrationResult>;
-    migrateFrom(source: client, options?: MigrationOptions): Promise<MigrationResult>;
     request<T>(path: string, body: RequestBody): Promise<T>;
 }
 export declare class PostgresClient extends client {
