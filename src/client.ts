@@ -1,6 +1,7 @@
 import { SparkError } from './errors.js';
 import { TableQuery } from './table.js';
 import { CollectionClient } from './collection.js';
+import { Storage } from './storage.js';
 import type {
   ColumnDefinition,
   DatabaseType,
@@ -33,6 +34,7 @@ export class SparkClient {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly fetcher: typeof fetch;
+  private storageClient?: Storage;
 
   constructor(type: DatabaseType, credentials: SparkCredentials, options?: SparkClientOptions);
   constructor(databaseUrl: string, apiKey: string, options?: SparkClientOptions);
@@ -112,16 +114,33 @@ export class SparkClient {
     return this.dropTable(name);
   }
 
-  /** Low-level request. Sends the database URL + API key to a SparkDB endpoint. */
+  /** Object storage (Spark Bucket): `storage.bucket('avatars').upload(file)`. */
+  get storage(): Storage {
+    if (!this.storageClient) this.storageClient = new Storage(this);
+    return this.storageClient;
+  }
+
+  /** Database request: POST with the database URL injected (table/query endpoints). */
   async request<T>(path: string, body: RequestBody): Promise<T> {
-    const response = await this.fetcher(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Spark-API-Key': this.apiKey
-      },
-      body: JSON.stringify({ database_url: this.databaseUrl, ...body })
-    });
+    return this.call<T>('POST', path, { json: { database_url: this.databaseUrl, ...body } });
+  }
+
+  /**
+   * Low-level authenticated call. Supports any verb, JSON or multipart bodies.
+   * The Files API uses this for GET/DELETE/upload; `request` wraps it for the
+   * database endpoints.
+   */
+  async call<T>(method: string, path: string, init: { json?: unknown; body?: BodyInit } = {}): Promise<T> {
+    const headers: Record<string, string> = { 'X-Spark-API-Key': this.apiKey };
+    let body: BodyInit | undefined;
+    if (init.json !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(init.json);
+    } else if (init.body !== undefined) {
+      body = init.body; // FormData sets its own multipart Content-Type
+    }
+
+    const response = await this.fetcher(`${this.baseUrl}${path}`, { method, headers, body });
 
     if (!response.ok) {
       let message = `SparkDB request failed with status ${response.status}`;

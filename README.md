@@ -86,6 +86,29 @@ await mongo.collection<Event>('events').deleteMany({ name: 'user.logout' });
 await mongo.query(JSON.stringify({ listCollections: 1 }));
 ```
 
+## Object storage (Spark Bucket)
+
+Store and serve files. Public buckets get a shareable URL on `files.sparkdb.pro`.
+
+```ts
+await db.storage.createBucket('avatars', { public: true });
+
+// Upload a web Blob/File...
+const blob = await fetch('https://example.com/cat.png').then((r) => r.blob());
+const object = await db.storage.bucket('avatars').upload(blob);
+console.log(object.url); // https://files.sparkdb.pro/files/ab12Cd34Ef.png
+
+// ...or raw bytes (Node Buffer/Uint8Array/string)
+await db.storage.bucket('avatars').upload({ data: buffer, filename: 'cat.png', contentType: 'image/png' });
+
+const files = await db.storage.bucket('avatars').list();
+await db.storage.deleteObject(files[0].id);
+await db.storage.bucket('avatars').delete(); // delete the bucket + its files
+```
+
+Uploads count against your plan's bucket storage. Prefer numeric ids
+(`db.storage.bucket(3)`) in hot paths to skip the name→id lookup.
+
 ## Client construction
 
 ```ts

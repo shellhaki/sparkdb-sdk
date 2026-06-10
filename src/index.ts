@@ -1,6 +1,7 @@
 export { SparkClient, PostgresClient, MySQLClient, MongoDBClient } from './client.js';
 export { TableQuery } from './table.js';
 export { CollectionClient } from './collection.js';
+export { Storage, BucketHandle } from './storage.js';
 export { SparkError } from './errors.js';
 export type {
   Primitive,
@@ -19,7 +20,10 @@ export type {
   MongoSchemaField,
   SchemaColumn,
   SchemaTable,
-  Schema
+  Schema,
+  StorageBucket,
+  BucketObject,
+  UploadInput
 } from './types.js';
 
 import { SparkClient } from './client.js';

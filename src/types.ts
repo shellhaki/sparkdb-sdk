@@ -78,3 +78,28 @@ export type Schema = {
 };
 
 export type RequestBody = Record<string, unknown>;
+
+export type StorageBucket = {
+  id: number;
+  name: string;
+  public: boolean;
+  object_count: number;
+  total_bytes: number;
+  created_at: string;
+};
+
+export type BucketObject = {
+  id: number;
+  bucket_id: number;
+  storage_name: string;
+  filename: string;
+  size: number;
+  content_type: string;
+  url: string;
+  created_at: string;
+};
+
+/** A web Blob/File, or raw bytes plus a filename. */
+export type UploadInput =
+  | Blob
+  | { data: Blob | ArrayBuffer | Uint8Array | string; filename: string; contentType?: string };
